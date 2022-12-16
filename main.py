@@ -18,7 +18,8 @@ reserved = {
     'else' : 'ELSE',
     'int' : 'INT',
     'float' : 'FLOAT',
-    'main': 'MAIN'
+    'main': 'MAIN', 
+    'char': 'CHAR'
 }
 
 # Demais TOKENS
@@ -30,7 +31,7 @@ tokens = [
 ] + list(reserved.values())
 
 #t_ignore = ' \t\n'
-
+print(tokens)
 def t_REM(t):
     r'REM .*'
     return t
@@ -67,19 +68,21 @@ def t_error(t):
     print("ERROR: Illegal character '{0}' at line {1}".format(t.value[0], t.lineno))
     t.lexer.skip(1)
 space = ' '
-t_ignore  = space+'Â\t\n '
+t_ignore  = space+'\t\n '
 # Constroi o analisador léxico
 lexer = lex.lex()
 
-
 def p_inicio(p):
     'inicio : INT MAIN LPAREN RPAREN blocoprincipal'
+    print('Conteudo reconhecido com sucesso!')
 
 def p_conteudo(p):
-    '''conteudo : declaracoes conteudo
+    '''conteudo : declaracoes
+                | declaracoes conteudo
+                | atribuicoes 
                 | atribuicoes conteudo
+                | if  
                 | if conteudo 
-                | else conteudo
                 | empty'''
 
 def p_blocoprincipal(p):
@@ -88,22 +91,39 @@ def p_blocoprincipal(p):
 def p_ids(p):
     '''ids : COMMA ID
             | COMMA ID ids'''
-
+    simbolos[p[2]] = {'valor': None, 'tipo': None, 'contexto':get_contexto()}
 def p_empty(p):
      'empty :'
      pass
 
+def get_contexto():
+    return contexto
+
 def p_declaracoes(p):
     '''declaracoes : tipo ID SEMICOLON
-                    | tipo ID SEMICOLON declaracoes
-                    | tipo ID ids SEMICOLON declaracoes
-                    | tipo ID EQUALS INTEGER SEMICOLON declaracoes
-                    | tipo ID EQUALS FLOATN SEMICOLON declaracoes
+                    | tipo ID ids SEMICOLON 
+                    | tipo ID EQUALS INTEGER SEMICOLON 
+                    | tipo ID EQUALS FLOATN SEMICOLON 
                     | empty'''
+    
+    if p[3]=='=':
+        if p[2] in list(simbolos.keys()):
+            raise AssertionError("Variavel com o mesmo nome já declarada!")
+        else:
+            simbolos[p[2]] = {'valor': p[4], 'tipo': p[1], 'contexto':get_contexto()}
+    else:    
+        simbolos[p[2]] = {'valor': None, 'tipo': p[1], 'contexto':get_contexto()}        
 
+    
 def p_atribuicoes(p):
     '''atribuicoes : ID EQUALS INTEGER SEMICOLON
                     | ID EQUALS FLOATN SEMICOLON'''
+    
+    if p[1] in simbolos:
+        ## aqui faltou verificar tipo da atribuição
+        print(str(simbolos[p[1]]['tipo']))
+    else:
+        raise AssertionError("Variavel não declarada!")
 
 def p_condicao(p):
     '''condicao : ID LT INTEGER
@@ -114,16 +134,29 @@ def p_condicao(p):
                 | ID GE INTEGER 
                 | ID GT FLOATN
                 | ID LE FLOATN'''
-    
+    if p[1] in simbolos:
+        print("variavel declarada!")
+    else:
+        raise AssertionError("Variavel não declarada!")
+
 def p_bloco(p):
-    '''bloco : LBRACES atribuicoes RBRACES
-            | LBRACES operacao RBRACES'''
+    '''bloco : LBRACES  conteudo_if RBRACES'''
+
+def p_conteudo_if(p):
+    '''conteudo_if : atribuicoes conteudo_if
+                    | operacao conteudo_if
+                    | if
+                    | empty
+    '''
 
 def p_if(p):
-    '''if   : IF LPAREN condicao RPAREN bloco'''
+    '''if   : IF LPAREN condicao RPAREN bloco
+            | IF LPAREN condicao RPAREN bloco else'''
+    global contexto
+    contexto = contexto + 1
 
 def p_else(p):
-    '''else : ELSE LBRACES bloco RBRACES'''
+    '''else : ELSE bloco'''
 
 def p_operador(p):
     '''operador : PLUS
@@ -144,7 +177,8 @@ def p_operacao(p):
 
 def p_tipo(p):
     '''tipo : INT
-            | FLOAT '''
+            | FLOAT 
+            | CHAR'''
     p[0] = p[1]
 
 
@@ -169,4 +203,4 @@ for tok in lexer:
      print(tok)
 
 yacc.parse(data, debug=logging.getLogger())
-print(simbolos)
+
